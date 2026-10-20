@@ -139,6 +139,20 @@ class MainWindow(QMainWindow):
         self.worker = None
 
         # ==========================================
+        # STREAMING SUAVE
+        # ==========================================
+
+        self._texto_respuesta = ""
+        self._fragmentos_pendientes = []
+
+        self._timer_streaming = QTimer(self)
+        self._timer_streaming.setInterval(40)
+
+        self._timer_streaming.timeout.connect(
+            self.actualizar_streaming
+        )
+
+        # ==========================================
         # INTERFAZ
         # ==========================================
 
@@ -746,6 +760,9 @@ class MainWindow(QMainWindow):
             "assistant"
         )
 
+        self._texto_respuesta = ""
+        self._fragmentos_pendientes.clear()
+
         self.layout_mensajes.insertWidget(
             self.layout_mensajes.count() - 1,
             self.burbuja_ia
@@ -780,24 +797,43 @@ class MainWindow(QMainWindow):
             self.mostrar_error
         )
 
+        self._timer_streaming.start()
         self.worker.start()
 
     # ==========================================
-    # MOSTRAR STREAMING
+    # STREAMING SUAVE
     # ==========================================
 
     def mostrar_fragmento(self, texto):
+        """Recibe fragmentos sin redibujar la interfaz."""
 
-        self.burbuja_ia.actualizar_contenido(
-            self.burbuja_ia.content + texto
+        self._fragmentos_pendientes.append(texto)
+        self._texto_respuesta += texto
+
+    def actualizar_streaming(self):
+        """Muestra los fragmentos acumulados en un solo lote."""
+
+        if not self._fragmentos_pendientes:
+            return
+
+        texto = "".join(
+            self._fragmentos_pendientes
         )
 
-        # Mantener visible el mensaje más reciente.
-        QTimer.singleShot(
-            0,
-            lambda: self.area_mensajes.verticalScrollBar().setValue(
-                self.area_mensajes.verticalScrollBar().maximum()
-            )
+        self._fragmentos_pendientes.clear()
+
+        if not texto:
+            return
+
+        self.burbuja_ia.mensaje.agregar_texto_streaming(
+            texto
+        )
+
+        # Desplazar una sola vez por lote, no por fragmento.
+        barra = self.area_mensajes.verticalScrollBar()
+
+        barra.setValue(
+            barra.maximum()
         )
     # ==========================================
     # GENERACIÓN TERMINADA
@@ -805,20 +841,33 @@ class MainWindow(QMainWindow):
 
     def generacion_terminada(self):
 
+        self._timer_streaming.stop()
+
+        # Mostrar cualquier fragmento pendiente.
+        self.actualizar_streaming()
+
+        # Aplicar el formato Markdown definitivo una sola vez.
+        self.burbuja_ia.actualizar_contenido(
+            self._texto_respuesta
+        )
+
         self.cargar_conversaciones()
 
         self.seleccionar_conversacion_activa()
 
         if self.memory_window is not None:
-
             self.memory_window.cargar_memorias()
 
-        self.boton_enviar.setEnabled(
-            True
-        )
-
+        self.boton_enviar.setEnabled(True)
         self.entrada.setFocus()
 
+        # Mantener visible el final de la respuesta.
+        QTimer.singleShot(
+            0,
+            lambda: self.area_mensajes.verticalScrollBar().setValue(
+                self.area_mensajes.verticalScrollBar().maximum()
+            )
+        )
     # ==========================================
     # ERROR
     # ==========================================
@@ -827,6 +876,14 @@ class MainWindow(QMainWindow):
         self,
         mensaje
     ):
+
+        self._timer_streaming.stop()
+        self.actualizar_streaming()
+
+        if hasattr(self, "burbuja_ia"):
+            self.burbuja_ia.actualizar_contenido(
+                self._texto_respuesta
+            )
 
         burbuja_error = ChatBubble(
             f"⚠️ Error: {mensaje}",

@@ -8,7 +8,7 @@ import markdown
 import html as html_lib
 
 from PySide6.QtCore import Qt, QTimer, QMimeData
-from PySide6.QtGui import QPixmap, QTextDocument
+from PySide6.QtGui import QPixmap, QTextDocument, QTextCursor
 from PySide6.QtWidgets import (
     QWidget,
     QLabel,
@@ -272,6 +272,7 @@ class MensajeMarkdown(QWidget):
         self.layout_contenido = QVBoxLayout(self)
         self.layout_contenido.setContentsMargins(0, 0, 0, 0)
         self.layout_contenido.setSpacing(8)
+        self.streaming_browser = None
 
     def limpiar_contenido(self):
         while self.layout_contenido.count():
@@ -282,6 +283,59 @@ class MensajeMarkdown(QWidget):
                 widget.deleteLater()
 
         self.bloques_codigo.clear()
+        self.streaming_browser = None
+
+    def agregar_texto_streaming(self, texto):
+        """Añade texto sin reconstruir todo el Markdown."""
+
+        if not texto:
+            return
+
+        if self.streaming_browser is None:
+            self.limpiar_contenido()
+
+            navegador = QTextBrowser(self)
+
+            navegador.setReadOnly(True)
+            navegador.setOpenExternalLinks(False)
+
+            navegador.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse
+            )
+
+            navegador.setVerticalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+
+            navegador.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+
+            navegador.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.Preferred
+            )
+
+            navegador.document().setDocumentMargin(4)
+
+            self.streaming_browser = navegador
+
+            self.layout_contenido.addWidget(navegador)
+
+        navegador = self.streaming_browser
+
+        cursor = navegador.textCursor()
+
+        cursor.movePosition(
+            QTextCursor.MoveOperation.End
+        )
+
+        cursor.insertText(texto)
+
+        navegador.setTextCursor(cursor)
+
+        # Ajustar la altura sin recrear el navegador.
+        self.ajustar_fragmento(navegador)
 
     def formatear_tablas(self, html):
 
