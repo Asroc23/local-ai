@@ -1,0 +1,28 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Variables de entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Datos locales y archivos adjuntos
+data/
+uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Editores
+.vscode/
+.idea/
+
+# Copias de seguridad
+*.backup*
+*-backup*
+*.bak
